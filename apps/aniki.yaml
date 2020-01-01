@@ -1,0 +1,5 @@
+apiVersion: fleet/v1
+name: aniki
+repo: homelab/aniki
+namespace: apps # grandfathered in the shared namespace (plan B5)
+pages: [aniki]

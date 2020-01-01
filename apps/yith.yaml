@@ -1,0 +1,4 @@
+apiVersion: fleet/v1
+name: yith
+repo: homelab/yith
+namespace: apps # grandfathered in the shared namespace (plan B5)

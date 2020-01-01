@@ -1,0 +1,29 @@
+# owners.yaml — the registry trust root (decoupling program B0a).
+#
+# `operators:` may approve OPERATOR-TIER changes (anything beyond a request-tier
+# self-serve edit): new/deleted spec files, this file, workflows, schema refs,
+# and security-tier fields (egress, sso, db/env secrets, repo, namespace,
+# previews.enabled). The gate checks their APPROVED review — pinned to the PR
+# head sha — via the Forgejo API.
+#
+# `apps:` maps each app to the user(s) allowed REQUEST-TIER self-merge of that
+# app's own apps/<name>.yaml: quota bumps within the tier ladder, extra
+# hostnames under the app's own prefix, cronjob/job counts within cap, LLM caps
+# within the fleet ceiling, previews ttl/tier.
+#
+# owners.yaml is itself OPERATOR-TIER: editing this file is never self-merge.
+# The gate runs base-ref (pull_request_target) so a PR head cannot spoof it.
+#
+# TODAY's reality: all app-agent work authenticates as `openchamber-agent` (the
+# OpenChamber PR loop). Per-app bot users (<name>-agent) arrive with the apps-org
+# migration (step 6) — swap each entry to its dedicated identity then.
+operators: [romni, rlyeh-agent]
+apps:
+  antipax: [openchamber-agent] # future: antipax-agent
+  aniki: [openchamber-agent] # future: aniki-agent
+  assessor: [openchamber-agent] # future: assessor-agent
+  elabora: [openchamber-agent] # future: elabora-agent
+  history: [openchamber-agent] # future: history-agent
+  plugins: [openchamber-agent] # future: plugins-agent
+  streamdeck: [openchamber-agent] # future: streamdeck-agent
+  yith: [openchamber-agent] # future: yith-agent

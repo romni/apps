@@ -1,0 +1,56 @@
+# The registry's tiered approval gate — BASE-REF by design (pull_request_target,
+# probed working + spoof-proof on Forgejo 15.0.5): this workflow always executes
+# from the DEFAULT branch, so a PR cannot edit the gate that judges it. PR head
+# content is only ever fetched as DATA (raw file at the head sha), never checked
+# out or executed.
+#
+# Verdict rules (decoupling program B0a; owners.yaml is the trust root):
+#   REQUEST TIER (gate green, author self-merges):
+#     - the diff touches EXACTLY one modified file, apps/<app>.yaml
+#     - the PR author owns <app> per owners.yaml (base version)
+#     - the head spec validates against the platform schema
+#       (homelab/rlyeh raw: schema/appspec.json)
+#     - every changed field is request-tier within the platform catalog's
+#       bounds (homelab/rlyeh raw: infra/lib/fleet-catalog.json)
+#   OPERATOR TIER (anything else — new/deleted files, owners.yaml, workflows,
+#   security-tier fields): passes ONLY with an APPROVED review, pinned to the
+#   current head sha, from a user in owners.yaml `operators:`. Reviews do not
+#   re-trigger workflows on this Forgejo — after approving, re-run the gate
+#   from the UI or push an empty commit.
+#
+# Branch protection on this repo requires the single context:
+#   gate / gate (pull_request_target)
+name: gate
+on:
+  pull_request_target:
+
+jobs:
+  gate:
+    runs-on: ram
+    timeout-minutes: 10
+    steps:
+      # BASE checkout: trusted gate code + trusted owners.yaml.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # pyyaml (specs are YAML) + jsonschema (the platform schema is a JSON
+      # Schema). The ram label image is node:<lts>-bookworm with python3 but
+      # neither lib; Debian's pip needs --break-system-packages in this
+      # throwaway container. Cached wheels keep warm runs off the network.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/pip
+          key: gate-pip-${{ runner.os }}-${{ runner.arch }}
+      - name: Install gate deps
+        run: python3 -m pip install --break-system-packages --quiet pyyaml jsonschema
+      - name: Tiered approval check
+        env:
+          API: ${{ github.server_url }}/api/v1
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SCHEMA_URL: ${{ github.server_url }}/homelab/rlyeh/raw/branch/main/schema/appspec.json
+          CATALOG_URL: ${{ github.server_url }}/homelab/rlyeh/raw/branch/main/infra/lib/fleet-catalog.json
+        run: python3 .forgejo/scripts/gate.py

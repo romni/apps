@@ -1,0 +1,4 @@
+apiVersion: fleet/v1
+name: antipax
+repo: homelab/antipax
+namespace: apps # grandfathered in the shared namespace (plan B5)
