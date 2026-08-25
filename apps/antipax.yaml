@@ -1,4 +1,11 @@
 apiVersion: fleet/v1
 name: antipax
 repo: apps/antipax
-namespace: apps # grandfathered in the shared namespace (plan B5)
+# Per-app-namespace PILOT (decoupling step 9): first tenant out of the shared
+# `apps` namespace. The factory stamps app-antipax with full default-deny (both
+# directions), S quota, priority guards, and the deploy identity — plus the
+# sso-proxy ingress grant so the observability oauth2-proxy fronting
+# antipax.apps.<bd> reaches the pod on :8080 through the deny.
+namespace: app-antipax
+quotaTier: S
+ingress: [sso-proxy]
