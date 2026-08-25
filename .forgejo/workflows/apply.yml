@@ -1,4 +1,4 @@
-# apply.yml — CI-owned fleet apply (decoupling program B0b, owner decision).
+# apply.yml — CI-owned fleet apply (owner decision).
 # A merge to main IS the grant taking effect: this job applies the fleet Pulumi
 # stack so a request-tier self-merge converges with zero operator action.
 #
@@ -89,7 +89,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.FLEET_STATE_SECRET_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.FLEET_PULUMI_PASSPHRASE }}
           GATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Delegated LiteLLM keygen credential (B7) — a proxy_admin virtual key,
+          # Delegated LiteLLM keygen credential — a proxy_admin virtual key,
           # NOT the master key. Empty when unminted: the fleet program then skips
           # LLM key minting entirely (hand-minted keys keep working).
           FLEET_LITELLM_KEYGEN: ${{ secrets.LITELLM_KEYGEN_KEY }}
@@ -138,7 +138,7 @@ jobs:
           # (writes scratch Pulumi.fleet.yaml in the ephemeral checkout only).
           pulumi config set fleet:dir "$GITHUB_WORKSPACE"
           pulumi config set fleet:kubeconfig "$KUBECONFIG"
-          # Delegated keygen credential (B7), guarded on non-empty. Set --secret
+          # Delegated keygen credential, guarded on non-empty. Set --secret
           # from stdin (never argv) so it is encrypted in the ephemeral checkout's
           # Pulumi.fleet.yaml — like fleet:dir, it lives only for this run. Unset =>
           # the fleet program skips LLM minting.

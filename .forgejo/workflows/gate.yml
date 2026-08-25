@@ -4,7 +4,7 @@
 # content is only ever fetched as DATA (raw file at the head sha), never checked
 # out or executed.
 #
-# Verdict rules (decoupling program B0a; owners.yaml is the trust root):
+# Verdict rules (owners.yaml is the trust root):
 #   REQUEST TIER (gate green, author self-merges):
 #     - the diff touches EXACTLY one modified file, apps/<app>.yaml
 #     - the PR author owns <app> per owners.yaml (base version)

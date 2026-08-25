@@ -1,8 +1,7 @@
 apiVersion: fleet/v1
 name: plugins
 # plugins is fleet tooling (the dev@homelab marketplace), so it keeps its
-# homelab-org home PERMANENTLY — it does NOT move to the apps org at step 6.
-# This explicit repo: override reproduces current state exactly (zero change).
+# homelab-org home permanently; the explicit repo: override below sets that.
 repo: homelab/plugins
-namespace: apps # grandfathered in the shared namespace (plan B5)
+namespace: apps # grandfathered into the shared namespace (pre-dates per-app namespaces)
 pages: [plugins]

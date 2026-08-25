@@ -1,7 +1,7 @@
 apiVersion: fleet/v1
 name: antipax
 repo: apps/antipax
-# Per-app-namespace PILOT (decoupling step 9): first tenant out of the shared
+# Per-app-namespace PILOT: first tenant out of the shared
 # `apps` namespace. The factory stamps app-antipax with full default-deny (both
 # directions), S quota, priority guards, and the deploy identity — plus the
 # sso-proxy ingress grant so the observability oauth2-proxy fronting
@@ -9,7 +9,7 @@ repo: apps/antipax
 namespace: app-antipax
 quotaTier: S
 ingress: [sso-proxy]
-# Per-PR preview sandboxes (WS5 pilot): the factory stamps app-antipax-preview
+# Per-PR preview sandboxes: the factory stamps app-antipax-preview
 # with the same default-deny + S quota + the -preview deploy identity; previews
 # publish behind the shared SSO gate (label `preview` on a PR).
 previews:
