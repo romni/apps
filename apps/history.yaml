@@ -1,5 +1,5 @@
 apiVersion: fleet/v1
 name: history
-repo: homelab/history
+repo: apps/history
 namespace: apps # grandfathered in the shared namespace (plan B5)
 pages: [history]
