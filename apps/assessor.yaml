@@ -1,5 +1,5 @@
 apiVersion: fleet/v1
 name: assessor
-repo: homelab/assessor
+repo: apps/assessor
 namespace: apps # grandfathered in the shared namespace (plan B5)
 pages: [assessor]

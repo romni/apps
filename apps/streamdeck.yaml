@@ -1,5 +1,5 @@
 apiVersion: fleet/v1
 name: streamdeck
-repo: homelab/streamdeck
+repo: apps/streamdeck
 namespace: apps # grandfathered in the shared namespace (plan B5)
 pages: [streamdeck]

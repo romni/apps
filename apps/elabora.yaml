@@ -1,5 +1,5 @@
 apiVersion: fleet/v1
 name: elabora
-repo: homelab/elabora
+repo: apps/elabora
 namespace: apps # grandfathered in the shared namespace (plan B5)
 pages: [elabora]
