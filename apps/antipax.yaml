@@ -9,3 +9,9 @@ repo: apps/antipax
 namespace: app-antipax
 quotaTier: S
 ingress: [sso-proxy]
+# Per-PR preview sandboxes (WS5 pilot): the factory stamps app-antipax-preview
+# with the same default-deny + S quota + the -preview deploy identity; previews
+# publish behind the shared SSO gate (label `preview` on a PR).
+previews:
+  enabled: true
+  quotaTier: S
