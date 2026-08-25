@@ -89,6 +89,10 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.FLEET_STATE_SECRET_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.FLEET_PULUMI_PASSPHRASE }}
           GATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Delegated LiteLLM keygen credential (B7) — a proxy_admin virtual key,
+          # NOT the master key. Empty when unminted: the fleet program then skips
+          # LLM key minting entirely (hand-minted keys keep working).
+          FLEET_LITELLM_KEYGEN: ${{ secrets.LITELLM_KEYGEN_KEY }}
         run: |
           # Self-reporting: an unattended apply that fails must surface WHERE —
           # there is no run-log API on this Forgejo, so on failure the log tail
@@ -134,7 +138,20 @@ jobs:
           # (writes scratch Pulumi.fleet.yaml in the ephemeral checkout only).
           pulumi config set fleet:dir "$GITHUB_WORKSPACE"
           pulumi config set fleet:kubeconfig "$KUBECONFIG"
-          pulumi up --yes --refresh
+          # Delegated keygen credential (B7), guarded on non-empty. Set --secret
+          # from stdin (never argv) so it is encrypted in the ephemeral checkout's
+          # Pulumi.fleet.yaml — like fleet:dir, it lives only for this run. Unset =>
+          # the fleet program skips LLM minting.
+          if [ -n "${FLEET_LITELLM_KEYGEN:-}" ]; then
+            printf '%s' "$FLEET_LITELLM_KEYGEN" | pulumi config set --secret fleet:litellmKeygenKey
+          fi
+          # NO --refresh: the k8s provider persists its kubeconfig INPUT in state,
+          # and this run's kubeconfig carries a minutes-lived OIDC token — a later
+          # run's refresh would read live state with the PREVIOUS run's expired
+          # token and 401 (observed live, runs 11912/11913). The fleet stack fully
+          # owns its resources, so apply-vs-state diffing suffices; drift healing
+          # is a deliberate operator `pulumi refresh` with a durable credential.
+          pulumi up --yes
           echo "fleet applied @ registry $GITHUB_SHA"
       # Best-effort announce (deploy-helm.yml contract): never fails the job,
       # silently skips when the ci-bot secret is absent.
