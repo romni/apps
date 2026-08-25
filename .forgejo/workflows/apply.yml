@@ -1,0 +1,132 @@
+# apply.yml — CI-owned fleet apply (decoupling program B0b, owner decision).
+# A merge to main IS the grant taking effect: this job applies the fleet Pulumi
+# stack so a request-tier self-merge converges with zero operator action.
+#
+# CREDENTIAL POSTURE — no standing kube credential exists for this job:
+#   - Cluster: a short-lived Forgejo Actions OIDC token minted PER RUN, which
+#     the apiserver maps to User `forgejo-ci:repo:homelab/apps:ref:refs/heads/main`.
+#     That user holds the `fleet-applier` ClusterRole (app-plane kinds only,
+#     bind fenced to admin/deploy-routes) and a ValidatingAdmissionPolicy
+#     confines it to the `apps`/`app-*` namespaces at admission — it CANNOT
+#     touch a platform namespace even where RBAC would allow the kind.
+#   - Pulumi state: repo-level secrets (FLEET_STATE_* + FLEET_PULUMI_PASSPHRASE,
+#     delivered by `task forge`) scoped to the s3://fleet-state bucket, which
+#     holds ONLY this stack's state — never the platform state (cluster PKI).
+#
+# The fleet PROGRAM comes from the platform repo's protected main (same trust
+# root the gate uses for schema/catalog); the SPECS come from this checkout.
+# `task up-fleet` on the host remains the manual/recovery path.
+name: apply
+enable-openid-connect: true
+on:
+  push:
+    branches: [main]
+
+jobs:
+  apply:
+    runs-on: docker
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # Pinned tool binaries, warm-restored from the LAN cache (build-image
+      # pattern). kubectl only builds the token-bearing kubeconfig; pulumi runs
+      # the apply. Renovate bumps both pins.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/homelab-fleet-tools
+          key: fleet-tools-v3.259.0-v1.36.4-${{ runner.os }}-${{ runner.arch }}
+      - name: Install pulumi + kubectl
+        env:
+          # renovate: datasource=github-releases depName=pulumi/pulumi
+          PULUMI_VERSION: v3.259.0
+          # renovate: datasource=github-releases depName=kubernetes/kubernetes
+          KUBECTL_VERSION: v1.36.4
+        run: |
+          set -eu
+          case "$(uname -m)" in
+            x86_64) ARCH=x64; KARCH=amd64 ;;
+            aarch64) ARCH=arm64; KARCH=arm64 ;;
+            *) echo "unsupported arch $(uname -m)" >&2; exit 1 ;;
+          esac
+          cache="$HOME/.cache/homelab-fleet-tools"
+          mkdir -p "$cache"
+          if [ ! -x "$cache/pulumi-$PULUMI_VERSION/pulumi" ]; then
+            curl -fsSL --retry 4 --retry-all-errors --retry-delay 2 -o /tmp/pulumi.tgz \
+              "https://get.pulumi.com/releases/sdk/pulumi-${PULUMI_VERSION}-linux-${ARCH}.tar.gz"
+            mkdir -p "$cache/pulumi-$PULUMI_VERSION"
+            tar -xzf /tmp/pulumi.tgz -C "$cache/pulumi-$PULUMI_VERSION" --strip-components=1
+            rm -f /tmp/pulumi.tgz
+          fi
+          if [ ! -x "$cache/kubectl-$KUBECTL_VERSION" ]; then
+            curl -fsSL --retry 4 --retry-all-errors --retry-delay 2 -o "$cache/kubectl-$KUBECTL_VERSION" \
+              "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/${KARCH}/kubectl"
+            chmod +x "$cache/kubectl-$KUBECTL_VERSION"
+          fi
+          install -m755 "$cache/kubectl-$KUBECTL_VERSION" /usr/local/bin/kubectl
+          for b in "$cache/pulumi-$PULUMI_VERSION"/*; do install -m755 "$b" "/usr/local/bin/$(basename "$b")"; done
+          pulumi version && kubectl version --client=true
+      - name: Fetch the fleet program (platform repo @ main)
+        run: |
+          set -eu
+          git clone --depth 1 --branch main "${GITHUB_SERVER_URL}/homelab/rlyeh.git" "$RUNNER_TEMP/rlyeh"
+          echo "fleet program @ $(git -C "$RUNNER_TEMP/rlyeh" rev-parse --short HEAD)"
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            ~/.npm
+            ~/.pulumi/plugins
+          key: fleet-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: fleet-npm-
+      - name: Apply the fleet stack
+        env:
+          KUBECONFIG_DATA: ${{ vars.DEPLOY_KUBECONFIG }}
+          S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.FLEET_STATE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.FLEET_STATE_SECRET_KEY }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.FLEET_PULUMI_PASSPHRASE }}
+        run: |
+          set -eu
+          # Token-bearing kubeconfig for THIS run (deploy-helm.yml pattern):
+          # credential-less server+CA from the org var, OIDC token appended.
+          export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+          install -m600 /dev/null "$KUBECONFIG"
+          printf '%s' "$KUBECONFIG_DATA" | base64 -d > "$KUBECONFIG"
+          TOKEN="$(curl -fsSL "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=forgejo-ci" \
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" | jq -r '.value')"
+          kubectl config set-credentials ci --token="$TOKEN"
+          kubectl config set-context --current --user=ci
+
+          cd "$RUNNER_TEMP/rlyeh/infra"
+          npm ci --no-audit --no-fund
+          cd fleet
+          export PULUMI_BACKEND_URL="s3://fleet-state?endpoint=${S3_ENDPOINT}&s3ForcePathStyle=true&region=us-east-1"
+          pulumi stack select fleet
+          # Point the program at THIS checkout's specs + the run's kubeconfig
+          # (writes scratch Pulumi.fleet.yaml in the ephemeral checkout only).
+          pulumi config set fleet:dir "$GITHUB_WORKSPACE"
+          pulumi config set fleet:kubeconfig "$KUBECONFIG"
+          pulumi up --yes --refresh
+          echo "fleet applied @ registry $GITHUB_SHA"
+      # Best-effort announce (deploy-helm.yml contract): never fails the job,
+      # silently skips when the ci-bot secret is absent.
+      - name: Announce on Zulip
+        continue-on-error: true
+        env:
+          ZULIP_URL: ${{ vars.ZULIP_URL }}
+          ZULIP_EMAIL: ${{ secrets.ZULIP_CI_BOT_EMAIL }}
+          ZULIP_KEY: ${{ secrets.ZULIP_CI_BOT_KEY }}
+          HEAD_MSG: ${{ github.event.head_commit.message }}
+        run: |
+          if [ -z "${ZULIP_EMAIL:-}" ] || [ -z "${ZULIP_KEY:-}" ] || [ -z "${ZULIP_URL:-}" ]; then
+            echo "zulip ci-bot not configured — skipping announce"; exit 0
+          fi
+          sha7="$(printf '%s' "$GITHUB_SHA" | cut -c1-7)"
+          subject="$(printf '%s' "$HEAD_MSG" | head -n1)"
+          content="**fleet** applied registry @ ${sha7} — ${subject}"
+          curl -sf -u "${ZULIP_EMAIL}:${ZULIP_KEY}" -X POST "${ZULIP_URL}/api/v1/messages" \
+            --data-urlencode type=stream --data-urlencode to=agents \
+            --data-urlencode topic=releases --data-urlencode "content=${content}" \
+            >/dev/null 2>&1 || echo "announce skipped (Zulip unreachable)" >&2
+          exit 0
