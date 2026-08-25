@@ -117,8 +117,11 @@ jobs:
           export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
           install -m600 /dev/null "$KUBECONFIG"
           printf '%s' "$KUBECONFIG_DATA" | base64 -d > "$KUBECONFIG"
+          # python3, not jq: the bare docker-label image ships no jq (deploy-helm
+          # gets its jq from the ci-deploy container; this job runs uncontainered).
           TOKEN="$(curl -fsSL "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=forgejo-ci" \
-            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" | jq -r '.value')"
+            -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["value"])')"
           kubectl config set-credentials ci --token="$TOKEN"
           kubectl config set-context --current --user=ci
 
