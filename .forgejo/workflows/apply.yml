@@ -21,6 +21,8 @@ enable-openid-connect: true
 on:
   push:
     branches: [main]
+  # Manual re-fire for recovery/debugging — applies exactly what main holds.
+  workflow_dispatch:
 
 jobs:
   apply:
@@ -86,7 +88,29 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.FLEET_STATE_ACCESS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.FLEET_STATE_SECRET_KEY }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.FLEET_PULUMI_PASSPHRASE }}
+          GATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Self-reporting: an unattended apply that fails must surface WHERE —
+          # there is no run-log API on this Forgejo, so on failure the log tail
+          # lands in a registry issue (secrets never echo: pulumi masks state
+          # values, and this script prints no credential).
+          log="$(mktemp)"
+          on_fail() {
+            code=$?
+            tail -c 20000 "$log" || true
+            python3 - "$log" <<'PYEOF' || true
+          import json,os,sys,urllib.request
+          body = "First 60k of the failed apply log:\n\n```\n" + open(sys.argv[1]).read()[-60000:] + "\n```"
+          req = urllib.request.Request(
+              os.environ["GITHUB_API_URL"].rstrip("/") + f"/repos/{os.environ['GITHUB_REPOSITORY']}/issues",
+              data=json.dumps({"title": f"CI fleet apply FAILED @ {os.environ['GITHUB_SHA'][:9]}", "body": body}).encode(),
+              headers={"Authorization": "token " + os.environ["GATE_TOKEN"], "Content-Type": "application/json"}, method="POST")
+          urllib.request.urlopen(req, timeout=30)
+          PYEOF
+            exit "$code"
+          }
+          trap on_fail ERR
+          exec > >(tee "$log") 2>&1
           set -eu
           # Token-bearing kubeconfig for THIS run (deploy-helm.yml pattern):
           # credential-less server+CA from the org var, OIDC token appended.
