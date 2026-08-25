@@ -1,0 +1,4 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Repo-specific Renovate rules only — the fleet baseline (homelab/rlyeh renovate-baseline.json) is applied globally by the in-cluster CronJob."
+}
