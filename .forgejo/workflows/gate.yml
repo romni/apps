@@ -33,16 +33,38 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           persist-credentials: false
-      # pyyaml (specs are YAML) + jsonschema (the platform schema is a JSON
-      # Schema). The ram label image is node:<lts>-bookworm with python3 but
-      # neither lib; Debian's pip needs --break-system-packages in this
-      # throwaway container. Cached wheels keep warm runs off the network.
+      # The gate is DEPENDENCY-FREE python (stdlib + the pinned yq binary for
+      # YAML→JSON): the ram label image (node:<lts>-bookworm) ships python3 but
+      # NO pip, so pyyaml/jsonschema installs are impossible — gate.py parses
+      # YAML through yq and validates the schema with a built-in interpreter of
+      # exactly the keyword subset appspec.json uses (it fails loudly if the
+      # schema ever grows past that subset). Same pinned-yq install + LAN cache
+      # as homelab/actions conformance.yml.
+      # renovate: datasource=github-releases depName=mikefarah/yq
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/pip
-          key: gate-pip-${{ runner.os }}-${{ runner.arch }}
-      - name: Install gate deps
-        run: python3 -m pip install --break-system-packages --quiet pyyaml jsonschema
+          path: ~/.cache/homelab-yq
+          key: yq-v4.53.6-${{ runner.os }}-${{ runner.arch }}
+      - name: Install yq
+        env:
+          YQ_VERSION: v4.53.6
+        run: |
+          set -eu
+          case "$(uname -m)" in
+            x86_64)  ARCH=amd64 ;;
+            aarch64) ARCH=arm64 ;;
+            *) echo "gate: unsupported architecture $(uname -m)" >&2; exit 1 ;;
+          esac
+          cache="$HOME/.cache/homelab-yq"
+          mkdir -p "$cache"
+          bin="$cache/yq-$YQ_VERSION-$ARCH"
+          if [ ! -x "$bin" ]; then
+            curl -fsSL --retry 4 --retry-all-errors --retry-delay 2 -o "$bin" \
+              "https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_${ARCH}"
+            chmod +x "$bin"
+          fi
+          install -m755 "$bin" /usr/local/bin/yq
+          yq --version
       - name: Tiered approval check
         env:
           API: ${{ github.server_url }}/api/v1

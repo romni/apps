@@ -15,10 +15,8 @@ import json
 import os
 import re
 import sys
+import subprocess
 import urllib.request
-
-import yaml  # installed by the workflow step (pip)
-import jsonschema
 
 API = os.environ["API"]
 REPO = os.environ["REPO"]
@@ -36,6 +34,71 @@ def api(path: str, raw: bool = False):
     with urllib.request.urlopen(req, timeout=30) as r:
         data = r.read()
     return data if raw else json.loads(data)
+
+def yaml_load(text_or_path: str, is_path: bool = True):
+    """Parse YAML via the pinned yq binary (the runner image ships no pip, so
+    no pyyaml): yq -o=json converts, stdlib json parses."""
+    if is_path:
+        out = subprocess.run(["yq", "-o=json", ".", text_or_path], capture_output=True, text=True)
+    else:
+        out = subprocess.run(["yq", "-o=json", "."], input=text_or_path, capture_output=True, text=True)
+    if out.returncode != 0:
+        die(f"yq parse failed: {out.stderr.strip()}")
+    return json.loads(out.stdout)
+
+def validate_subset(spec, schema, path="$"):
+    """Minimal JSON-Schema interpreter covering EXACTLY the keywords
+    schema/appspec.json uses (type, required, properties,
+    additionalProperties, enum, pattern, items, const). Unknown keywords are
+    IGNORED-BY-NAME but asserted below so schema evolution past the subset
+    fails loudly instead of silently not validating."""
+    SUPPORTED = {"$schema", "$id", "title", "description", "type", "required",
+                 "properties", "additionalProperties", "enum", "pattern",
+                 "items", "const", "minimum", "maximum", "maxLength", "minLength", "_comment"}
+    unknown = set(schema) - SUPPORTED
+    if unknown:
+        die(f"schema uses keywords outside the gate's validator subset: {sorted(unknown)} — extend gate.py")
+    t = schema.get("type")
+    if t:
+        ok = {"object": dict, "array": list, "string": str, "boolean": bool}.get(t)
+        if ok and not isinstance(spec, ok):
+            return f"{path}: expected {t}"
+        if t == "number" and not isinstance(spec, (int, float)):
+            return f"{path}: expected number"
+        if t == "integer" and not isinstance(spec, int):
+            return f"{path}: expected integer"
+    if "const" in schema and spec != schema["const"]:
+        return f"{path}: must be {schema['const']!r}"
+    if "enum" in schema and spec not in schema["enum"]:
+        return f"{path}: {spec!r} not in {schema['enum']}"
+    if "pattern" in schema and isinstance(spec, str) and not re.search(schema["pattern"], spec):
+        return f"{path}: {spec!r} fails pattern {schema['pattern']}"
+    if "minimum" in schema and isinstance(spec, (int, float)) and spec < schema["minimum"]:
+        return f"{path}: {spec} < minimum {schema['minimum']}"
+    if "maximum" in schema and isinstance(spec, (int, float)) and spec > schema["maximum"]:
+        return f"{path}: {spec} > maximum {schema['maximum']}"
+    if "maxLength" in schema and isinstance(spec, str) and len(spec) > schema["maxLength"]:
+        return f"{path}: length {len(spec)} > maxLength {schema['maxLength']}"
+    if "minLength" in schema and isinstance(spec, str) and len(spec) < schema["minLength"]:
+        return f"{path}: length {len(spec)} < minLength {schema['minLength']}"
+    if isinstance(spec, dict):
+        for req in schema.get("required", []):
+            if req not in spec:
+                return f"{path}: missing required '{req}'"
+        props = schema.get("properties", {})
+        for k, v in spec.items():
+            if k in props:
+                err = validate_subset(v, props[k], f"{path}.{k}")
+                if err:
+                    return err
+            elif schema.get("additionalProperties") is False:
+                return f"{path}: unknown property '{k}'"
+    if isinstance(spec, list) and "items" in schema:
+        for i, item in enumerate(spec):
+            err = validate_subset(item, schema["items"], f"{path}[{i}]")
+            if err:
+                return err
+    return None
 
 def fetch(url: str):
     req = urllib.request.Request(url, headers={"Authorization": f"token {TOKEN}"})
@@ -69,7 +132,7 @@ def flatten(d, prefix=""):
     return out
 
 def main() -> None:
-    owners_doc = yaml.safe_load(open("owners.yaml"))
+    owners_doc = yaml_load("owners.yaml")
     operators = owners_doc.get("operators") or []
     app_owners = owners_doc.get("apps") or {}
 
@@ -93,21 +156,21 @@ def main() -> None:
     m = re.fullmatch(r"apps/([a-z0-9](?:[a-z0-9-]*[a-z0-9])?)\.yaml", path or "")
     if not m:
         need_operator(f"'{path}' is not a single apps/<app>.yaml")
-    if status != "modified":
+    # Forgejo reports an edited file as "changed" (GitHub says "modified").
+    if status not in ("modified", "changed"):
         need_operator(f"apps file {status} (new/deleted specs are operator acts)")
     app = m.group(1)
     if AUTHOR not in (app_owners.get(app) or []):
         need_operator(f"author '{AUTHOR}' does not own app '{app}' per owners.yaml")
 
     # Base version from the trusted checkout; head version as DATA via the API.
-    base_spec = yaml.safe_load(open(path))
-    head_spec = yaml.safe_load(fetch(f"{API}/repos/{REPO}/raw/{path}?ref={HEAD_SHA}"))
+    base_spec = yaml_load(path)
+    head_spec = yaml_load(fetch(f"{API}/repos/{REPO}/raw/{path}?ref={HEAD_SHA}").decode(), is_path=False)
 
     schema = json.loads(fetch(os.environ["SCHEMA_URL"]))
-    try:
-        jsonschema.validate(head_spec, schema)
-    except jsonschema.ValidationError as e:
-        die(f"head spec fails the platform schema: {e.message}")
+    schema_err = validate_subset(head_spec, schema)
+    if schema_err:
+        die(f"head spec fails the platform schema: {schema_err}")
     catalog = json.loads(fetch(os.environ["CATALOG_URL"]))
 
     fb, fh = flatten(base_spec), flatten(head_spec)
