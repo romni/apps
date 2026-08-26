@@ -15,3 +15,15 @@ ingress: [sso-proxy]
 previews:
   enabled: true
   quotaTier: S
+
+ssoProxy:
+  host: antipax.apps
+  upstream: http://antipax.app-antipax.svc.cluster.local:80
+  cookieRefresh: 50m
+
+homepage:
+  name: antipax
+  host: antipax.apps
+  icon: mdi-earth
+  description: "AI grand-strategy game — self-hosted"
+

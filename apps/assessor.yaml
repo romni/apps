@@ -2,3 +2,6 @@ apiVersion: apps/v1
 name: assessor
 repo: apps/assessor
 pages: [assessor]
+
+pagesMeta:
+  assessor: { icon: mdi-clipboard-check, description: "Scribe — evidence-driven assessments" }

@@ -2,3 +2,6 @@ apiVersion: apps/v1
 name: elabora
 repo: apps/elabora
 pages: [elabora]
+
+pagesMeta:
+  elabora: { icon: mdi-gamepad-variant, description: "Godot 4 game (C#/.NET)" }

@@ -7,3 +7,70 @@ quotaTier: M
 # forgejo API lane, the capture structurer's AI gateway, ntfy pushes.
 egress: [garage, forgejo, litellm, ntfy]
 ingress: [cnpg-status, cnpg-sql, prometheus-scrape]
+
+database:
+  storage: 10Gi
+  cpu: 100m
+  memory: 512Mi
+  serverName: yith-db-v2
+  barmanObjectName: garage-yith
+  backupSchedule: "0 20 4 * * *"
+  superuser: true
+  image: vectorchord
+  # The kernel's trust-separated login roles (fixed name contract with the
+  # app's migrations — role names and group memberships are load-bearing on
+  # both sides).
+  roles:
+    - { role: yith_login_importer, inRoles: [yith_emitter, yith_query], secret: yith-login-importer, envVar: YITH_LOGIN_IMPORTER_PASSWORD }
+    - { role: yith_login_agent, inRoles: [yith_agent, yith_query], secret: yith-login-agent, envVar: YITH_LOGIN_AGENT_PASSWORD }
+    - { role: yith_login_watchjob, inRoles: [yith_watchjob, yith_query], secret: yith-login-watchjob, envVar: YITH_LOGIN_WATCHJOB_PASSWORD }
+    - { role: yith_login_exporter, inRoles: [yith_query], secret: yith-login-exporter, envVar: YITH_LOGIN_EXPORTER_PASSWORD }
+    - { role: yith_login_dump, inRoles: [yith_dump], secret: yith-login-dump, envVar: YITH_LOGIN_DUMP_PASSWORD, bypassrls: true }
+    - { role: yith_login_owner, inRoles: [yith_owner], secret: yith-login-owner, envVar: YITH_LOGIN_OWNER_PASSWORD }
+    - { role: yith_login_reader2, inRoles: [yith_reader2], secret: yith-login-reader2, envVar: YITH_LOGIN_READER2_PASSWORD }
+    - { role: yith_login_api, inRoles: [yith_owner, yith_structurer], secret: yith-login-api, envVar: YITH_LOGIN_API_PASSWORD }
+    - { role: yith_definer }
+
+secrets:
+  - name: yith-llm
+    data:
+      api-key: { env: LITELLM_YITH_KEY }
+  - name: yith-batch-db
+    id: yith-batch-db-apps
+    data:
+      read-url: { pgUrl: { database: yith, role: yith_login_exporter } }
+      dump-url: { pgUrl: { database: yith, role: yith_login_dump } }
+      jobs-url: { pgUrl: { database: yith, role: yith_login_watchjob } }
+  - name: automations-ntfy
+    id: automations-ntfy-apps
+    data:
+      topic: { env: NTFY_TOPIC }
+      token: { env: NTFY_TOKEN }
+
+forge:
+  bots:
+    - user: yith-batch
+      writeRepo: apps/yith-mirror
+      scopes: write:repository,read:issue,read:organization
+      secretName: yith-batch-forgejo
+  oauthClients:
+    - name: yith-app
+      confidential: false
+      secretName: yith-oidc
+      redirectUris:
+        - "https://yith.apps.{baseDomain}/auth/callback"
+        - "org.yith.app://auth/callback"
+  ownerAuth:
+    - secretName: yith-oidc
+      principal:
+        pgRole: yith_login_api
+        pgPasswordEnv: YITH_LOGIN_API_PASSWORD
+        scopes: [owner, assert, task, agenda]
+        sourceClass: human_direct
+        tier: confirmed
+  mirrorRepos:
+    - repo: apps/yith-mirror
+      description: "MIRROR-RENDER of the yith canon — machine-written by the yith-batch exporter"
+      private: true
+      machineWritten: true
+

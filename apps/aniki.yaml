@@ -8,3 +8,43 @@ repo: apps/aniki
 egress: [garage]
 ingress: [cnpg-status, cnpg-sql, prometheus-scrape]
 pages: [aniki]
+
+database:
+  storage: 5Gi
+  cpu: 50m
+  memory: 384Mi
+  # -v2: the archive generation for this namespace (a serverName change
+  # abandons the previous prefix, which stays readable for its retention).
+  serverName: aniki-db-v2
+  backupSchedule: "0 30 4 * * *"
+  superuser: true
+
+secrets:
+  - name: aniki-env
+    required: true
+    data:
+      NODE_ENV: { value: production }
+      ENCRYPTION_MASTER_KEY: { env: ANIKI_ENCRYPTION_MASTER_KEY }
+      TOKEN_SIGNING_KEY: { env: ANIKI_TOKEN_SIGNING_KEY }
+      BOT_SERVICE_TOKEN: { env: ANIKI_BOT_SERVICE_TOKEN }
+      # The app fail-fasts on EMPTY provider creds; the placeholders keep the
+      # stack booting with the consent flow dead until real values land.
+      TWITCH_CLIENT_ID: { env: ANIKI_TWITCH_CLIENT_ID, fallback: changeme-twitch-client-id }
+      TWITCH_CLIENT_SECRET: { env: ANIKI_TWITCH_CLIENT_SECRET, fallback: changeme-twitch-client-secret }
+      DISCORD_CLIENT_ID: { env: ANIKI_DISCORD_CLIENT_ID, fallback: changeme-discord-client-id }
+      DISCORD_CLIENT_SECRET: { env: ANIKI_DISCORD_CLIENT_SECRET, fallback: changeme-discord-client-secret }
+      PUBLIC_MANAGEMENT_URL: { template: "https://aniki.apps.{baseDomain}" }
+      PUBLIC_OVERLAY_URL: { template: "https://aniki-overlay.apps.{baseDomain}" }
+      PUBLIC_API_URL: { template: "https://aniki-api.apps.{baseDomain}" }
+      PUBLIC_REALTIME_URL: { template: "https://aniki-ws.apps.{baseDomain}" }
+      PUBLIC_WS_URL: { template: "wss://aniki-ws.apps.{baseDomain}" }
+
+homepage:
+  name: Aniki
+  host: aniki.apps
+  icon: mdi-broadcast
+  description: "Streamer platform — management UI"
+
+pagesMeta:
+  aniki: { icon: mdi-broadcast, description: "Streamer platform — overlays, games, chat bots" }
+

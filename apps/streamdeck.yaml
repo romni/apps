@@ -2,3 +2,6 @@ apiVersion: apps/v1
 name: streamdeck
 repo: apps/streamdeck
 pages: [streamdeck]
+
+pagesMeta:
+  streamdeck: { icon: mdi-view-grid, description: "Stream Deck XL plugin toolkit" }

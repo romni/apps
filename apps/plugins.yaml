@@ -4,3 +4,6 @@ name: plugins
 # homelab-org home permanently; the explicit repo: override below sets that.
 repo: homelab/plugins
 pages: [plugins]
+
+pagesMeta:
+  plugins: { icon: mdi-puzzle, description: "Agent skills & plugins marketplace" }

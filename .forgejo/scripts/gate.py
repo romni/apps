@@ -54,7 +54,8 @@ def validate_subset(spec, schema, path="$"):
     fails loudly instead of silently not validating."""
     SUPPORTED = {"$schema", "$id", "title", "description", "type", "required",
                  "properties", "additionalProperties", "enum", "pattern",
-                 "items", "const", "minimum", "maximum", "maxLength", "minLength", "_comment"}
+                 "items", "const", "minimum", "maximum", "exclusiveMinimum",
+                 "maxLength", "minLength", "_comment"}
     unknown = set(schema) - SUPPORTED
     if unknown:
         die(f"schema uses keywords outside the gate's validator subset: {sorted(unknown)} — extend gate.py")
@@ -77,6 +78,8 @@ def validate_subset(spec, schema, path="$"):
         return f"{path}: {spec} < minimum {schema['minimum']}"
     if "maximum" in schema and isinstance(spec, (int, float)) and spec > schema["maximum"]:
         return f"{path}: {spec} > maximum {schema['maximum']}"
+    if "exclusiveMinimum" in schema and isinstance(spec, (int, float)) and spec <= schema["exclusiveMinimum"]:
+        return f"{path}: {spec} <= exclusiveMinimum {schema['exclusiveMinimum']}"
     if "maxLength" in schema and isinstance(spec, str) and len(spec) > schema["maxLength"]:
         return f"{path}: length {len(spec)} > maxLength {schema['maxLength']}"
     if "minLength" in schema and isinstance(spec, str) and len(spec) < schema["minLength"]:
@@ -186,6 +189,12 @@ def main() -> None:
 
     def request_tier_ok(key: str) -> str | None:
         """None = allowed; a string = why it is operator-tier."""
+        # homepage.* / pagesMeta.* are cosmetic self-serve (an owner decision).
+        # `flatten` recurses dicts, so these arrive as `homepage.<leaf>` and
+        # `pagesMeta.<slug>.<leaf>` keys. This must precede the `pages` branch
+        # below, whose startswith("pages") would otherwise swallow `pagesMeta.*`.
+        if key.startswith("homepage.") or key.startswith("pagesMeta."):
+            return None
         if key == "quotaTier":
             return None if fh.get(key) in tiers else f"quotaTier '{fh.get(key)}' outside the ladder"
         if key == "hostname":
