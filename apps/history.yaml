@@ -1,5 +1,9 @@
 apiVersion: fleet/v1
 name: history
 repo: apps/history
-namespace: apps # grandfathered into the shared namespace (pre-dates per-app namespaces)
+# Sandbox grants: the CNPG cluster (platform-provisioned, lives in this
+# namespace) needs the operator admitted and the barman/S3 lane out; the app
+# itself sits behind the shared SSO proxy and talks to the AI gateway.
+egress: [garage, litellm]
+ingress: [sso-proxy, cnpg-status, cnpg-sql, prometheus-scrape]
 pages: [history]
