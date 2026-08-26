@@ -5,12 +5,12 @@
 # CREDENTIAL POSTURE — no standing kube credential exists for this job:
 #   - Cluster: a short-lived Forgejo Actions OIDC token minted PER RUN, which
 #     the apiserver maps to User `forgejo-ci:repo:homelab/apps:ref:refs/heads/main`.
-#     That user holds the `fleet-applier` ClusterRole (app-plane kinds only,
+#     That user holds the `apps-applier` ClusterRole (app-plane kinds only,
 #     bind fenced to admin/deploy-routes) and a ValidatingAdmissionPolicy
 #     confines it to the `apps`/`app-*` namespaces at admission — it CANNOT
 #     touch a platform namespace even where RBAC would allow the kind.
-#   - Pulumi state: repo-level secrets (FLEET_STATE_* + FLEET_PULUMI_PASSPHRASE,
-#     delivered by `task forge`) scoped to the s3://fleet-state bucket, which
+#   - Pulumi state: repo-level secrets (FLEET_STATE_* + APPS_PULUMI_PASSPHRASE,
+#     delivered by `task forge`) scoped to the s3://apps-state bucket, which
 #     holds ONLY this stack's state — never the platform state (cluster PKI).
 #
 # The apps PROGRAM comes from the platform repo's protected main (same trust
@@ -85,9 +85,9 @@ jobs:
         env:
           KUBECONFIG_DATA: ${{ vars.DEPLOY_KUBECONFIG }}
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.FLEET_STATE_ACCESS_KEY }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.FLEET_STATE_SECRET_KEY }}
-          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.FLEET_PULUMI_PASSPHRASE }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.APPS_STATE_ACCESS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.APPS_STATE_SECRET_KEY }}
+          PULUMI_CONFIG_PASSPHRASE: ${{ secrets.APPS_PULUMI_PASSPHRASE }}
           GATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Delegated LiteLLM keygen credential — a proxy_admin virtual key,
           # NOT the master key. Empty when unminted: the apps program then skips
@@ -132,8 +132,8 @@ jobs:
           cd "$RUNNER_TEMP/rlyeh/infra"
           npm ci --no-audit --no-fund
           cd apps
-          export PULUMI_BACKEND_URL="s3://fleet-state?endpoint=${S3_ENDPOINT}&s3ForcePathStyle=true&region=us-east-1"
-          pulumi stack select fleet
+          export PULUMI_BACKEND_URL="s3://apps-state?endpoint=${S3_ENDPOINT}&s3ForcePathStyle=true&region=us-east-1"
+          pulumi stack select apps
           # Point the program at THIS checkout's specs + the run's kubeconfig
           # (writes the scratch stack config in the ephemeral checkout only).
           pulumi config set apps:dir "$GITHUB_WORKSPACE"
