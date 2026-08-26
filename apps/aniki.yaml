@@ -1,4 +1,4 @@
-apiVersion: fleet/v1
+apiVersion: apps/v1
 name: aniki
 repo: apps/aniki
 # Sandbox grants: the platform-provisioned CNPG cluster in this namespace

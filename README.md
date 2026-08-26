@@ -1,9 +1,9 @@
-# apps — the fleet registry
+# apps — the apps registry
 
-This repository is the **fleet registry**: the single, version-controlled source
+This repository is the **apps registry**: the single, version-controlled source
 of truth for which apps the homelab runs and what each is allowed to do. It holds
 **grants as data** — one declarative `AppSpec` per app — reconciled onto the
-cluster by a batch apply of the platform's `fleet` Pulumi stack. There are no
+cluster by a batch apply of the platform's apps Pulumi stack. There are no
 controllers and no webhooks in the request path.
 
 ## Layout
@@ -14,19 +14,19 @@ owners.yaml          app -> bot user(s) allowed request-tier self-merge (the tru
 .forgejo/workflows/  the tiered merge gate
 ```
 
-An **AppSpec** (`apiVersion: fleet/v1`) declares an app's surface: its repo,
+An **AppSpec** (`apiVersion: apps/v1`) declares an app's surface: its repo,
 namespace, quota tier, egress grants, pages sites, preview sandbox, and more. The
 authoritative shape is the JSON Schema `schema/appspec.json` in the platform repo
-(`homelab/rlyeh`); the fleet factory (`infra/lib/fleet.ts` there) is the
+(`homelab/rlyeh`); the apps factory (`infra/lib/apps.ts` there) is the
 executable validator. Capability *values* — the egress grant names, auth modes,
 and quota-tier constants — are defined in the platform's catalog
-(`infra/lib/fleet-catalog.ts`). A new capability is one catalog entry there; it
+(`infra/lib/apps-catalog.ts`). A new capability is one catalog entry there; it
 never requires a change in this repo.
 
 ## How a change flows
 
 ```
-edit apps/<name>.yaml  ->  open a PR  ->  the gate runs (base-ref)  ->  merge  ->  fleet apply converges
+edit apps/<name>.yaml  ->  open a PR  ->  the gate runs (base-ref)  ->  merge  ->  apps apply converges
 ```
 
 The gate runs from the **base ref** (`pull_request_target`), so a PR cannot alter
@@ -42,7 +42,7 @@ fields within schema bounds:
 - quota-tier moves within the S / M / L ladder,
 - extra hostnames under the app's own `<name>*` prefix,
 - cronjob / job counts within cap,
-- LLM budget / rpm / parallel raises within the fleet-wide ceiling.
+- LLM budget / rpm / parallel raises within the platform-wide ceiling.
 
 **Operator-tier** (an operator's approving review is required) — everything else:
 
@@ -62,8 +62,8 @@ invalidated in either direction.
 
 ## Reconciliation & DR
 
-`task up-fleet` (in `homelab/rlyeh`) pulls this registry clone and applies the
-fleet stack. A registry CI apply job is the routine converge path; `task up-fleet`
+`task apps:apply` (in `homelab/rlyeh`) pulls this registry clone and applies the
+apps stack. A registry CI apply job is the routine converge path; `task apps:apply`
 is the operator's manual / recovery lever. This repo is mirrored to GitHub like
 the platform repo, so disaster recovery restores it *before* Forgejo exists —
 the platform bootstraps with zero app knowledge, then the registry re-stamps

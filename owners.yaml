@@ -9,7 +9,7 @@
 # `apps:` maps each app to the user(s) allowed REQUEST-TIER self-merge of that
 # app's own apps/<name>.yaml: quota bumps within the tier ladder, extra
 # hostnames under the app's own prefix, cronjob/job counts within cap, LLM caps
-# within the fleet ceiling, previews ttl/tier.
+# within the LLM ceilings, previews ttl/tier.
 #
 # owners.yaml is itself OPERATOR-TIER: editing this file is never self-merge.
 # The gate runs base-ref (pull_request_target) so a PR head cannot spoof it.

@@ -1,5 +1,5 @@
-# apply.yml — CI-owned fleet apply (owner decision).
-# A merge to main IS the grant taking effect: this job applies the fleet Pulumi
+# apply.yml — CI-owned apps apply (owner decision).
+# A merge to main IS the grant taking effect: this job applies the apps Pulumi
 # stack so a request-tier self-merge converges with zero operator action.
 #
 # CREDENTIAL POSTURE — no standing kube credential exists for this job:
@@ -13,9 +13,9 @@
 #     delivered by `task forge`) scoped to the s3://fleet-state bucket, which
 #     holds ONLY this stack's state — never the platform state (cluster PKI).
 #
-# The fleet PROGRAM comes from the platform repo's protected main (same trust
+# The apps PROGRAM comes from the platform repo's protected main (same trust
 # root the gate uses for schema/catalog); the SPECS come from this checkout.
-# `task up-fleet` on the host remains the manual/recovery path.
+# `task apps:apply` on the host remains the manual/recovery path.
 name: apply
 enable-openid-connect: true
 on:
@@ -37,8 +37,8 @@ jobs:
       # the apply. Renovate bumps both pins.
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
-          path: ~/.cache/homelab-fleet-tools
-          key: fleet-tools-v3.259.0-v1.36.4-${{ runner.os }}-${{ runner.arch }}
+          path: ~/.cache/homelab-apps-tools
+          key: apps-tools-v3.259.0-v1.36.4-${{ runner.os }}-${{ runner.arch }}
       - name: Install pulumi + kubectl
         env:
           # renovate: datasource=github-releases depName=pulumi/pulumi
@@ -52,7 +52,7 @@ jobs:
             aarch64) ARCH=arm64; KARCH=arm64 ;;
             *) echo "unsupported arch $(uname -m)" >&2; exit 1 ;;
           esac
-          cache="$HOME/.cache/homelab-fleet-tools"
+          cache="$HOME/.cache/homelab-apps-tools"
           mkdir -p "$cache"
           if [ ! -x "$cache/pulumi-$PULUMI_VERSION/pulumi" ]; then
             curl -fsSL --retry 4 --retry-all-errors --retry-delay 2 -o /tmp/pulumi.tgz \
@@ -69,19 +69,19 @@ jobs:
           install -m755 "$cache/kubectl-$KUBECTL_VERSION" /usr/local/bin/kubectl
           for b in "$cache/pulumi-$PULUMI_VERSION"/*; do install -m755 "$b" "/usr/local/bin/$(basename "$b")"; done
           pulumi version && kubectl version --client=true
-      - name: Fetch the fleet program (platform repo @ main)
+      - name: Fetch the apps program (platform repo @ main)
         run: |
           set -eu
           git clone --depth 1 --branch main "${GITHUB_SERVER_URL}/homelab/rlyeh.git" "$RUNNER_TEMP/rlyeh"
-          echo "fleet program @ $(git -C "$RUNNER_TEMP/rlyeh" rev-parse --short HEAD)"
+          echo "apps program @ $(git -C "$RUNNER_TEMP/rlyeh" rev-parse --short HEAD)"
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: |
             ~/.npm
             ~/.pulumi/plugins
-          key: fleet-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: fleet-npm-
-      - name: Apply the fleet stack
+          key: apps-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: apps-npm-
+      - name: Apply the apps stack
         env:
           KUBECONFIG_DATA: ${{ vars.DEPLOY_KUBECONFIG }}
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
@@ -90,9 +90,9 @@ jobs:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.FLEET_PULUMI_PASSPHRASE }}
           GATE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Delegated LiteLLM keygen credential — a proxy_admin virtual key,
-          # NOT the master key. Empty when unminted: the fleet program then skips
+          # NOT the master key. Empty when unminted: the apps program then skips
           # LLM key minting entirely (hand-minted keys keep working).
-          FLEET_LITELLM_KEYGEN: ${{ secrets.LITELLM_KEYGEN_KEY }}
+          APPS_LITELLM_KEYGEN: ${{ secrets.LITELLM_KEYGEN_KEY }}
         run: |
           # Self-reporting: an unattended apply that fails must surface WHERE —
           # there is no run-log API on this Forgejo, so on failure the log tail
@@ -107,7 +107,7 @@ jobs:
           body = "First 60k of the failed apply log:\n\n```\n" + open(sys.argv[1]).read()[-60000:] + "\n```"
           req = urllib.request.Request(
               os.environ["GITHUB_API_URL"].rstrip("/") + f"/repos/{os.environ['GITHUB_REPOSITORY']}/issues",
-              data=json.dumps({"title": f"CI fleet apply FAILED @ {os.environ['GITHUB_SHA'][:9]}", "body": body}).encode(),
+              data=json.dumps({"title": f"CI apps apply FAILED @ {os.environ['GITHUB_SHA'][:9]}", "body": body}).encode(),
               headers={"Authorization": "token " + os.environ["GATE_TOKEN"], "Content-Type": "application/json"}, method="POST")
           urllib.request.urlopen(req, timeout=30)
           PYEOF
@@ -131,28 +131,28 @@ jobs:
 
           cd "$RUNNER_TEMP/rlyeh/infra"
           npm ci --no-audit --no-fund
-          cd fleet
+          cd apps
           export PULUMI_BACKEND_URL="s3://fleet-state?endpoint=${S3_ENDPOINT}&s3ForcePathStyle=true&region=us-east-1"
           pulumi stack select fleet
           # Point the program at THIS checkout's specs + the run's kubeconfig
-          # (writes scratch Pulumi.fleet.yaml in the ephemeral checkout only).
-          pulumi config set fleet:dir "$GITHUB_WORKSPACE"
-          pulumi config set fleet:kubeconfig "$KUBECONFIG"
+          # (writes the scratch stack config in the ephemeral checkout only).
+          pulumi config set apps:dir "$GITHUB_WORKSPACE"
+          pulumi config set apps:kubeconfig "$KUBECONFIG"
           # Delegated keygen credential, guarded on non-empty. Set --secret
           # from stdin (never argv) so it is encrypted in the ephemeral checkout's
-          # Pulumi.fleet.yaml — like fleet:dir, it lives only for this run. Unset =>
-          # the fleet program skips LLM minting.
-          if [ -n "${FLEET_LITELLM_KEYGEN:-}" ]; then
-            printf '%s' "$FLEET_LITELLM_KEYGEN" | pulumi config set --secret fleet:litellmKeygenKey
+          # stack config — like apps:dir, it lives only for this run. Unset =>
+          # the apps program skips LLM minting.
+          if [ -n "${APPS_LITELLM_KEYGEN:-}" ]; then
+            printf '%s' "$APPS_LITELLM_KEYGEN" | pulumi config set --secret apps:litellmKeygenKey
           fi
           # NO --refresh: the k8s provider persists its kubeconfig INPUT in state,
           # and this run's kubeconfig carries a minutes-lived OIDC token — a later
           # run's refresh would read live state with the PREVIOUS run's expired
-          # token and 401 (observed live, runs 11912/11913). The fleet stack fully
+          # token and 401 (observed live, runs 11912/11913). The apps stack fully
           # owns its resources, so apply-vs-state diffing suffices; drift healing
           # is a deliberate operator `pulumi refresh` with a durable credential.
           pulumi up --yes
-          echo "fleet applied @ registry $GITHUB_SHA"
+          echo "apps applied @ registry $GITHUB_SHA"
       # Best-effort announce (deploy-helm.yml contract): never fails the job,
       # silently skips when the ci-bot secret is absent.
       - name: Announce on Zulip
@@ -168,7 +168,7 @@ jobs:
           fi
           sha7="$(printf '%s' "$GITHUB_SHA" | cut -c1-7)"
           subject="$(printf '%s' "$HEAD_MSG" | head -n1)"
-          content="**fleet** applied registry @ ${sha7} — ${subject}"
+          content="**apps** applied registry @ ${sha7} — ${subject}"
           curl -sf -u "${ZULIP_EMAIL}:${ZULIP_KEY}" -X POST "${ZULIP_URL}/api/v1/messages" \
             --data-urlencode type=stream --data-urlencode to=agents \
             --data-urlencode topic=releases --data-urlencode "content=${content}" \

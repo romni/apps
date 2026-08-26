@@ -1,6 +1,6 @@
-apiVersion: fleet/v1
+apiVersion: apps/v1
 name: plugins
-# plugins is fleet tooling (the dev@homelab marketplace), so it keeps its
+# plugins is shared tooling (the dev@homelab marketplace), so it keeps its
 # homelab-org home permanently; the explicit repo: override below sets that.
 repo: homelab/plugins
 pages: [plugins]

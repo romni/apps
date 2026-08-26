@@ -11,7 +11,7 @@
 #     - the head spec validates against the platform schema
 #       (homelab/rlyeh raw: schema/appspec.json)
 #     - every changed field is request-tier within the platform catalog's
-#       bounds (homelab/rlyeh raw: infra/lib/fleet-catalog.json)
+#       bounds (homelab/rlyeh raw: infra/lib/apps-catalog.json)
 #   OPERATOR TIER (anything else — new/deleted files, owners.yaml, workflows,
 #   security-tier fields): passes ONLY with an APPROVED review, pinned to the
 #   current head sha, from a user in owners.yaml `operators:`. Reviews do not
@@ -74,5 +74,5 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SCHEMA_URL: ${{ github.server_url }}/homelab/rlyeh/raw/branch/main/schema/appspec.json
-          CATALOG_URL: ${{ github.server_url }}/homelab/rlyeh/raw/branch/main/infra/lib/fleet-catalog.json
+          CATALOG_URL: ${{ github.server_url }}/homelab/rlyeh/raw/branch/main/infra/lib/apps-catalog.json
         run: python3 .forgejo/scripts/gate.py
