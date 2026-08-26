@@ -1,5 +1,9 @@
 apiVersion: fleet/v1
 name: yith
 repo: apps/yith
-namespace: apps # grandfathered into the shared namespace (pre-dates per-app namespaces)
 quotaTier: M
+# Sandbox grants: the platform-provisioned CNPG cluster (operator pair +
+# barman lane + DB metrics) plus the app's real edges — the batch tier's
+# forgejo API lane, the capture structurer's AI gateway, ntfy pushes.
+egress: [garage, forgejo, litellm, ntfy]
+ingress: [cnpg-status, cnpg-sql, prometheus-scrape]

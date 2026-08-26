@@ -1,5 +1,10 @@
 apiVersion: fleet/v1
 name: aniki
 repo: apps/aniki
-namespace: apps # grandfathered into the shared namespace (pre-dates per-app namespaces)
+# Sandbox grants: the platform-provisioned CNPG cluster in this namespace
+# needs the operator admitted and the barman lane out; world :443 for the
+# live-stream bots is the app's own chart-shipped companion policy (the
+# escape hatch), never a catalog grant.
+egress: [garage]
+ingress: [cnpg-status, cnpg-sql, prometheus-scrape]
 pages: [aniki]
