@@ -1,5 +1,4 @@
 apiVersion: fleet/v1
 name: elabora
 repo: apps/elabora
-namespace: apps # grandfathered into the shared namespace (pre-dates per-app namespaces)
 pages: [elabora]
