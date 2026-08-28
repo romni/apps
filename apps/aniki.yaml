@@ -8,6 +8,12 @@ repo: apps/aniki
 egress: [garage]
 ingress: [cnpg-status, cnpg-sql, prometheus-scrape]
 pages: [aniki]
+# Per-PR preview sandboxes: the factory stamps app-aniki-preview
+# with the same default-deny + S quota + the -preview deploy identity; previews
+# publish behind the shared SSO gate (label `preview` on a PR).
+previews:
+  enabled: true
+  quotaTier: S
 
 database:
   storage: 5Gi
