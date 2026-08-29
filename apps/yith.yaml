@@ -7,6 +7,12 @@ quotaTier: M
 # forgejo API lane, the capture structurer's AI gateway, ntfy pushes.
 egress: [garage, forgejo, litellm, ntfy]
 ingress: [cnpg-status, cnpg-sql, prometheus-scrape]
+# Per-PR preview sandboxes: the factory stamps app-yith-preview
+# with the same default-deny + S quota + the -preview deploy identity; previews
+# publish behind the shared SSO gate (label `preview` on a PR).
+previews:
+  enabled: true
+  quotaTier: S
 
 database:
   storage: 10Gi
