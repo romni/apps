@@ -5,7 +5,7 @@ repo: apps/aniki
 # needs the operator admitted and the barman lane out; world :443 for the
 # live-stream bots is the app's own chart-shipped companion policy (the
 # escape hatch), never a catalog grant.
-egress: [garage]
+egress: [garage, world-tls]
 ingress: [cnpg-status, cnpg-sql, prometheus-scrape]
 pages: [aniki]
 # Per-PR preview sandboxes: the factory stamps app-aniki-preview
