@@ -24,5 +24,6 @@ apps:
   elabora: [openchamber-agent] # future: elabora-agent
   history: [openchamber-agent] # future: history-agent
   plugins: [openchamber-agent] # future: plugins-agent
+  pretium: [openchamber-agent] # future: pretium-agent
   streamdeck: [openchamber-agent] # future: streamdeck-agent
   yith: [openchamber-agent] # future: yith-agent

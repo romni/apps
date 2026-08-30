@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+name: pretium
+repo: apps/pretium
+# Sandbox grants: the platform-provisioned CNPG cluster (operator + barman lane +
+# DB metrics) plus the app's real edges — the AI gateway, S3, and its own outbound
+# fetches of the retailer/web pages it tracks. The app sits behind the shared SSO
+# proxy. SearXNG web search is reached via the LiteLLM /v1/search endpoint over the
+# `litellm` grant (SearXNG has no catalog egress entry).
+egress: [litellm, garage, world-tls]
+ingress: [sso-proxy, cnpg-status, cnpg-sql, prometheus-scrape]
+
+database:
+  storage: 10Gi
+  cpu: 100m
+  memory: 512Mi
+  serverName: pretium-db
+  barmanObjectName: garage-pretium
+  backupSchedule: "0 40 4 * * *"
+  # pgvector via VectorChord (vchord); the app runs CREATE EXTENSION vchord in its
+  # own migrations. The owner connection is the CNPG-generated `pretium-db-app`.
+  image: vectorchord
+
+secrets:
+  # The app's server-side LLM key + gateway base URL. LITELLM_PRETIUM_KEY is a
+  # LiteLLM virtual key the operator mints and puts in the site .env; unset ⇒ the
+  # app's AI features stay dormant (the key materializes empty, no task-up error).
+  - name: pretium-llm
+    data:
+      LITELLM_API_KEY: { env: LITELLM_PRETIUM_KEY }
+      LITELLM_BASE_URL: { value: "http://litellm.ai.svc.cluster.local:4000" }
+
+buckets:
+  # Product/garment media. The credentials Secret carries ACCESS_KEY_ID /
+  # SECRET_ACCESS_KEY; the app supplies the in-cluster endpoint
+  # (http://garage.garage.svc.cluster.local:3900, path-style, us-east-1).
+  - bucket: pretium
+    secretName: pretium-s3
+
+# SSO front door: the platform stands up an oauth2-proxy for pretium.apps.<baseDomain>
+# in front of the app Service (Service `pretium` :80 in app-pretium). Paired with the
+# `sso-proxy` ingress grant above.
+ssoProxy:
+  host: pretium.apps
+  upstream: http://pretium.app-pretium.svc.cluster.local:80
+
+quotaTier: M
