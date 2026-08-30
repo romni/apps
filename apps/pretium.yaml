@@ -8,6 +8,13 @@ repo: apps/pretium
 # `litellm` grant (SearXNG has no catalog egress entry).
 egress: [litellm, garage, world-tls]
 ingress: [sso-proxy, cnpg-status, cnpg-sql, prometheus-scrape]
+# Per-PR preview sandboxes: the factory stamps app-pretium-preview with the same
+# default-deny + S quota + the -preview deploy identity; previews publish behind
+# the shared SSO gate (label `preview` on a PR). world-tls is structurally
+# stripped there — a preview never scrapes the outside world.
+previews:
+  enabled: true
+  quotaTier: S
 
 database:
   storage: 10Gi
@@ -16,8 +23,10 @@ database:
   serverName: pretium-db
   barmanObjectName: garage-pretium
   backupSchedule: "0 40 4 * * *"
-  # pgvector via VectorChord (vchord); the app runs CREATE EXTENSION vchord in its
-  # own migrations. The owner connection is the CNPG-generated `pretium-db-app`.
+  # pgvector via VectorChord: the alias delivers the WORKING stack — image +
+  # vchord.so preload + CREATE EXTENSION at initdb (rlyeh#645). App migrations
+  # ASSERT the extension, never create it (the CNPG `app` role isn't superuser).
+  # The owner connection is the CNPG-generated `pretium-db-app`.
   image: vectorchord
 
 secrets:
