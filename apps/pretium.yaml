@@ -20,7 +20,11 @@ database:
   storage: 10Gi
   cpu: 100m
   memory: 512Mi
-  serverName: pretium-db
+  # -r2: the cluster was recreated empty on 2026-08-30 (vchord rebuild,
+  # rlyeh#645 option A); barman refuses a non-empty archive dir for a new
+  # cluster ("Expected empty archive"), so the recreated cluster archives
+  # under a fresh server dir — same pattern as the platform's *-db-r2 pins.
+  serverName: pretium-db-r2
   barmanObjectName: garage-pretium
   backupSchedule: "0 40 4 * * *"
   # pgvector via VectorChord: the alias delivers the WORKING stack — image +
