@@ -14,16 +14,18 @@
 # owners.yaml is itself OPERATOR-TIER: editing this file is never self-merge.
 # The gate runs base-ref (pull_request_target) so a PR head cannot spoof it.
 #
-# All app-agent work currently authenticates as `openchamber-agent`; the
-# `# future:` comments mark the intended per-app identities.
-operators: [romni, rlyeh-agent]
+# One agent identity does all app-agent work: `deep-one` (the renamed
+# `rlyeh-agent`; the studio's separate `openchamber-agent` is collapsed into it,
+# 2026-09-04). `rlyeh-agent` stays listed only until the Forgejo rename lands,
+# then drops. The `# future:` comments mark the intended per-app identities.
+operators: [romni, rlyeh-agent, deep-one]
 apps:
-  antipax: [openchamber-agent] # future: antipax-agent
-  aniki: [openchamber-agent] # future: aniki-agent
-  assessor: [openchamber-agent] # future: assessor-agent
-  elabora: [openchamber-agent] # future: elabora-agent
-  history: [openchamber-agent] # future: history-agent
-  plugins: [openchamber-agent] # future: plugins-agent
-  pretium: [openchamber-agent] # future: pretium-agent
-  streamdeck: [openchamber-agent] # future: streamdeck-agent
-  yith: [openchamber-agent] # future: yith-agent
+  antipax: [rlyeh-agent, deep-one] # future: antipax-agent
+  aniki: [rlyeh-agent, deep-one] # future: aniki-agent
+  assessor: [rlyeh-agent, deep-one] # future: assessor-agent
+  elabora: [rlyeh-agent, deep-one] # future: elabora-agent
+  history: [rlyeh-agent, deep-one] # future: history-agent
+  plugins: [rlyeh-agent, deep-one] # future: plugins-agent
+  pretium: [rlyeh-agent, deep-one] # future: pretium-agent
+  streamdeck: [rlyeh-agent, deep-one] # future: streamdeck-agent
+  yith: [rlyeh-agent, deep-one] # future: yith-agent
