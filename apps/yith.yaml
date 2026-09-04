@@ -21,7 +21,6 @@ database:
   serverName: yith-db-v2
   barmanObjectName: garage-yith
   backupSchedule: "0 20 4 * * *"
-  superuser: true
   image: vectorchord
   # The kernel's trust-separated login roles (fixed name contract with the
   # app's migrations — role names and group memberships are load-bearing on

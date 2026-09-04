@@ -23,7 +23,6 @@ database:
   # abandons the previous prefix, which stays readable for its retention).
   serverName: aniki-db-v2
   backupSchedule: "0 30 4 * * *"
-  superuser: true
 
 secrets:
   - name: aniki-env
